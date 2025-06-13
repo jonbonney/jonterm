@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JonTerm</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="public/js/oregon-trail.js"></script>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #terminal {
+            height: 100%;
+            overflow-y: auto;
+        }
+        #output {
+            white-space: pre-wrap;
+            margin-bottom: 10px;
+        }
+        #input-line {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+        #prompt {
+            margin-right: 10px;
+            color: #00ff00;
+            user-select: none; /* Prevent selection of the prompt */
+        }
+        #command-input {
+            background: transparent;
+            border: none;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            flex-grow: 1;
+            outline: none;
+            caret-color: transparent; /* Hide the default cursor */
+        }
+        #command-input::after {
+            content: '';
+            position: absolute;
+            width: 10px; /* Thicker cursor */
+            height: 20px;
+            background-color: #00ff00;
+            animation: cursor-fade 1.5s ease-in-out infinite;
+            margin-left: 2px;
+        }
+        @keyframes cursor-fade {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+        /* Add a custom cursor element since input's caret can't be fully styled */
+        .custom-cursor {
+            position: absolute;
+            width: 10px;
+            height: 20px;
+            background-color: #00ff00;
+            animation: cursor-fade 1.5s ease-in-out infinite;
+            pointer-events: none;
+            left: 0;
+            margin-left: 2px;
+            transform: translateX(0);
+        }
+        .ascii-art {
+            color: #00ff00;
+            white-space: pre;
+            margin-bottom: 20px;
+        }
+        .command {
+            color: #00ccff;
+        }
+        .output {
+            color: #ff9900;
+            padding: 20px;
+        }
+        .error {
+            color: #ff4444;
+        }
+        #game-container {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #000;
+            padding: 20px;
+            border: 2px solid #00ff00;
+            z-index: 1000;
+        }
+        #game-canvas {
+            border: 1px solid #00ff00;
+        }
+        #game-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+        }
+        .category {
+            color: #ff9900;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .link-name {
+            color: #00ccff;
+        }
+        .link-url {
+            color: #00ff00;
+        }
+        .link-url a {
+            color: #00ff00;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        .link-url a:hover {
+            color: #66ff66;
+            text-decoration: underline;
+        }
+        .help-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 24px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div id="terminal">
+        <div id="output">
+            <div class="ascii-art">
+       *              .         oooo                       ooooooooooooo                                     
+   .          *                 `888                       8'   888   `8                                     
+                       *         888  .ooooo.  ooo. .oo.        888       .ooooo.  oooo d8b ooo. .oo.  .oo.  
+     .     *                     888 d88' `88b `888P"Y88b       888      d88' `88b `888""8P `888P"Y88bP"Y88b 
+                                 888 888   888  888   888       888      888ooo888  888      888   888   888 
+             /\                  888 888   888  888   888       888      888    .o  888      888   888   888 
+   .        /**\             .o. 88P `Y8bod8P' o888o o888o     o888o     `Y8bod8P' d888b    o888o o888o o888o
+           /****\   /\       `Y888P                                                                    © 2025
+          /      \ /**\                                                                                
+         /  /\    /    \        /\    /\  /\      /\            /\/\/\  /\    /\      
+        /  /  \  /      \      /  \/\/  \/  \  /\/  \/\  /\  /\/ / /  \/  \  /  \    ^  ^  ^          ___I_ 
+       /  /    \/ /\     \    /    \ \  /    \/ /   /  \/  \/  \  /    \   \/ /\ \  /|\/|\/|\  ^     /\-_--\
+      /  /      \/  \/\   \  /      \    /   /    \                          /    \ /|\/|\/|\ /|\   /  \_-__\      
+   __/__/     __/___/  \__ \_______________________________________________________ /|\/|\/|\ /|\   |[]| [] | _____
+            </div>
+            <div class="output">Welcome to JonTerm! Type '<span class="command">help</span>' to see available commands.</div>
+        </div>
+        <div id="input-line">
+            <span id="prompt">visitor@jonbonney.com:~$</span>
+            <input type="text" id="command-input" autofocus>
+            <div class="custom-cursor"></div>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <canvas id="game-canvas" width="800" height="300"></canvas>
+        <div id="game-overlay">Score: 0</div>
+    </div>
+
+    <script>
+        // Game variables and other existing variables
+        const commandHistory = [];
+        let currentHistoryIndex = -1;
+
+        const commands = {
+            help: () => `JonTerm is an interactive web terminal created by Jon Bonney.
+
+Available commands:
+
+<span class="category">About</span>
+<span class="command">whois</span>     Display information about Jon
+<span class="command">links</span>     Links to other platforms, projects, or resources
+<span class="command">hire</span>      How to hire me
+<span class="command">email</span>     Open email client to contact me
+<span class="command">read</span>      Books I recommend reading
+
+<span class="category">Fun</span>
+<span class="command">jump</span>      Start the jumping game
+<span class="command">trail</span>     Play Oregon Trail
+<span class="command">fortune</span>   Receive a wise fortune
+<span class="command">art</span>       Display the JonTerm ASCII art
+<span class="command">star</span>      Give this a star
+
+<span class="category">Utility</span>
+<span class="command">help</span>      Show this help message
+<span class="command">version</span>   Show the current version of JonTerm
+<span class="command">time</span>      Show current time in Central Time
+<span class="command">weather</span>   Show current weather (cities: stl, atx, la, nyc)
+<span class="command">clear</span>     Clear the terminal
+<span class="command">echo</span>      Echo back the provided text
+<span class="command">history</span>   Show command history`,
+
+            weather: async (args) => {
+                const cities = {
+                    'stl': {
+                        name: 'Saint Louis, MO',
+                        coords: [38.6270, -90.1994]
+                    },
+                    'atx': {
+                        name: 'Austin, TX',
+                        coords: [30.2672, -97.7431]
+                    },
+                    'la': {
+                        name: 'Los Angeles, CA',
+                        coords: [34.0522, -118.2437]
+                    },
+                    'nyc': {
+                        name: 'New York City, NY',
+                        coords: [40.7128, -74.0060]
+                    }
+                };
+
+                const city = args[0]?.toLowerCase() || 'stl';
+
+                if (!cities[city]) {
+                    return `Invalid city. Available cities are: ${Object.keys(cities).join(', ')}
+Usage: weather [city]
+Example: weather nyc`;
+                }
+
+                try {
+                    const { name, coords } = cities[city];
+                    // First get the coordinates for the city
+                    const pointsResponse = await fetch(`https://api.weather.gov/points/${coords[0]},${coords[1]}`);
+                    const pointsData = await pointsResponse.json();
+                    
+                    // Get the forecast URL from the points response
+                    const forecastUrl = pointsData.properties.forecast;
+                    const forecastResponse = await fetch(forecastUrl);
+                    const forecastData = await forecastResponse.json();
+
+                    // Get current conditions URL from points response
+                    const observationStationsUrl = pointsData.properties.observationStations;
+                    const stationsResponse = await fetch(observationStationsUrl);
+                    const stationsData = await stationsResponse.json();
+
+                    // Get the first station's observations
+                    const firstStation = stationsData.features[0].id;
+                    const observationsResponse = await fetch(`${firstStation}/observations/latest`);
+                    const observationsData = await observationsResponse.json();
+
+                    // Format the weather data
+                    const currentTemp = observationsData.properties.temperature.value;
+                    const tempF = (currentTemp * 9/5 + 32).toFixed(1);
+                    const conditions = forecastData.properties.periods[0].shortForecast;
+                    const humidity = observationsData.properties.relativeHumidity.value.toFixed(0);
+                    const windSpeed = observationsData.properties.windSpeed.value;
+                    const windSpeedMph = (windSpeed * 2.237).toFixed(1);
+
+                    return `Current Weather in ${name}:
+Temperature: ${tempF}°F
+Conditions: ${conditions}
+Humidity: ${humidity}%
+Wind Speed: ${windSpeedMph} mph`;
+                } catch (error) {
+                    return 'Unable to fetch weather data at the moment. Please try again later.';
+                }
+            },
+
+            time: () => {
+                const options = {
+                    timeZone: 'America/Chicago',
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    timeZoneName: 'short'
+                };
+                return new Date().toLocaleString('en-US', options);
+            },
+
+            art: () => `        *              .         oooo                       ooooooooooooo                                      
+    .          *                 \`888                       8'   888   \`8                                      
+                        *         888  .ooooo.  ooo. .oo.        888       .ooooo.  oooo d8b ooo. .oo.  .oo.   
+      .     *                     888 d88' \`88b \`888P"Y88b       888      d88' \`88b \`888""8P \`888P"Y88bP"Y88b  
+                                  888 888   888  888   888       888      888ooo888  888      888   888   888  
+              /\\                  888 888   888  888   888       888      888    .o  888      888   888   888   
+    .        /**\\             .o. 88P \`Y8bod8P' o888o o888o     o888o     \`Y8bod8P' d888b    o888o o888o o888o  
+            /****\\   /\\       \`Y888P                                                                    © 2025
+           /      \\ /**\\                                                                                
+          /  /\\    /    \\        /\\    /\\  /\\      /\\            /\\/\\/\\  /\\    /\\
+         /  /  \\  /      \\      /  \\/\\/  \\/  \\  /\\/  \\/\\  /\\  /\\/ / /  \\/  \\  /  \\
+        /  /    \\/ /\\     \\    /    \\ \\  /    \\/ /   /  \\/  \\/  \\  /    \\   \\/ /\\ \\                  
+       /  /      \\/  \\/\\   \\  /      \\    /   /    \\                          /    \\                  
+    __/__/_______/___/__\\___\\____________________________________________________________________________________`,
+
+            whois: () => `Jon Bonney
+A passionate developer and tech enthusiast.
+Currently working on exciting projects and exploring new technologies.
+Always eager to learn and create something new!`,
+
+            links: () => `<span class="category">Platforms</span>
+<span class="link-name">GitHub</span>    <span class="link-url"><a href="https://github.com/jonbonney" target="_blank">github.com/jonbonney</a></span>
+<span class="link-name">YouTube</span>   <span class="link-url"><a href="https://youtube.com/@jonbonney" target="_blank">youtube.com/@jonbonney</a></span>
+<span class="link-name">LinkedIn</span>  <span class="link-url"><a href="https://linkedin.com/in/jonathan-bonney" target="_blank">linkedin.com/in/jonathan-bonney</a></span>
+<span class="link-name">Twitter</span>   <span class="link-url"><a href="https://twitter.com/jondoesthing" target="_blank">@jondoesthing</a></span>
+
+<span class="category">Projects</span>
+<span class="link-name">Website</span>   <span class="link-url"><a href="https://jonbonney.com" target="_blank">jonbonney.com</a></span>
+<span class="link-name">ByteBlaze</span> <span class="link-url"><a href="https://byteblazesoftware.com" target="_blank">byteblazesoftware.com</a></span>
+<span class="link-name">Clothing</span>  <span class="link-url"><a href="https://jointhetechnocracy.com" target="_blank">jointhetechnocracy.com</a></span>
+<span class="link-name">Podcast</span>   <span class="link-url"><a href="https://thesignalpodcast.com" target="_blank">thesignalpodcast.com</a></span>`,
+
+            read: () => `<span class="category">Recommended Reading</span>
+
+<span class="category">Programming</span>
+<span class="link-name">Learn Go with Tests</span>  <span class="link-url">Chris James</span>         <span class="link-url"><a href="https://quii.gitbook.io/learn-go-with-tests" target="_blank">quii.gitbook.io</a></span>
+<span class="link-name">We, Programmers</span>      <span class="link-url">Robert L. Glass</span>     <span class="link-url"><a href="https://www.amazon.com/We-Programmers-Chronicle-Coders-Robert/dp/0135344263" target="_blank">amazon.com</a></span>
+<span class="link-name">Design Patterns</span>      <span class="link-url">Gang of Four</span>        <span class="link-url"><a href="https://www.amazon.com/Design-Patterns-Elements-Reusable-Object-Oriented/dp/0201633612" target="_blank">amazon.com</a></span>
+<span class="link-name">Cracking the Coding</span>  <span class="link-url">Gayle McDowell</span>      <span class="link-url"><a href="https://www.amazon.com/Cracking-Coding-Interview-Programming-Questions/dp/0984782850" target="_blank">amazon.com</a></span>
+<span class="link-name">    Interview</span> 
+
+<span class="category">Philosophy</span>
+<span class="link-name">Meditations</span>          <span class="link-url">Marcus Aurelius</span>     <span class="link-url"><a href="https://www.amazon.com/Meditations-Marcus-Aurelius/dp/0140430009" target="_blank">amazon.com</a></span>`,
+
+            clear: () => {
+                const historyCommand = document.createElement('div');
+                historyCommand.className = 'output';
+                historyCommand.innerHTML = 'Terminal cleared';
+                document.getElementById('output').innerHTML = '';
+                document.getElementById('output').appendChild(historyCommand);
+                return '';
+            },
+
+            history: () => {
+                if (commandHistory.length === 0) {
+                    return 'No commands in history';
+                }
+                return commandHistory.map((cmd, index) => 
+                    `${(index + 1).toString().padStart(4)} ${cmd}`
+                ).join('\n');
+            },
+
+            echo: (args) => args.join(' '),
+
+            star: () => {
+                window.open('https://github.com/ByteBlaze-Software-Solutions/jonbonney', '_blank');
+                return 'Opening GitHub repository... Thanks for your support! 🌟';
+            },
+
+            hire: () => `Want to work together? I'd love to hear about your project!
+
+Email me at jon@byteblazesoftware.com with:
+- A brief description of your project
+- Your timeline and budget
+- How you'd like to work together
+
+I specialize in:
+- Full-stack web development
+- Custom software solutions
+- AI/ML integration
+- Technical consulting
+
+I look forward to building something amazing with you! 🚀`,
+
+            email: () => {
+                window.location.href = 'mailto:jon@byteblazesoftware.com';
+                return 'Opening email client...';
+            },
+
+            fortune: (() => {
+                // Create a closure to maintain state
+                let usedFortuneIndices = new Set();
+                const fortunes = [
+                    "Surely you can find better sources of advice than a digital cookie.",
+                    "When debugging, novices insert corrective code; experts remove defective code.",
+                    "First, solve the problem. Then, write the code.",
+                    "Code is like humor. When you have to explain it, it's bad.",
+                    "The only way to learn a new programming language is by writing programs in it.",
+                    "The most important property of a program is whether it accomplishes the intention of its user.",
+                    "Programming is less about what you know and more about what you can figure out.",
+                    "The best way to predict the future is to implement it.",
+                    "Every great developer you know got there by solving problems they were unqualified to solve until they actually did it.",
+                    "It's not a bug – it's an undocumented feature.",
+                    "Documentation is a love letter that you write to your future self.",
+                    "A good programmer is someone who always looks both ways before crossing a one-way street.",
+                    "The best thing about a boolean is even if you are wrong, you are only off by a bit.",
+                    "Your mind is your best tool. It's better than any IDE or framework.",
+                    "Simplicity is prerequisite for reliability.",
+                    "The computer was born to solve problems that did not exist before.",
+                    "Any code of your own that you haven't looked at for six or more months might as well have been written by someone else.",
+                    "The most dangerous phrase in software development is 'we've always done it this way'.",
+                    "Good code is its own best documentation.",
+                    "There are only two hard things in Computer Science: cache invalidation and naming things.",
+                    "The sooner you start to code, the longer the program will take.",
+                    "Weeks of coding can save you hours of planning.",
+                    "If debugging is the process of removing software bugs, then programming must be the process of putting them in.",
+                    "Talk is cheap. Show me the code.",
+                    "Software and cathedrals are much the same – first we build them, then we pray.",
+                    "The best performance improvement is the transition from the nonworking state to the working state.",
+                    "One of the best programming skills you can have is knowing when to walk away for a while.",
+                    "The only sure way to reduce runtime is to remove code.",
+                    "You can only move fast and break things if you make enough money to pay for the lawyers.",
+                    "Don't keep log statements that you won't care about in a month.",
+                    "Refactor not because you have time, but because tomorrow you won't.",
+                    "A pull request is a conversation, not a decree.",
+                    "The cleanest code is an empty file.",
+                    "Your code will be read or executed many more times than it is written.",
+                    "Ask yourself: what is the simplest thing that could possibly work?",
+                    "Version control: because 'final_final_really_final.js' is not a strategy.",
+                ];
+
+                return () => {
+                    // If we've used all fortunes, reset the used set
+                    if (usedFortuneIndices.size === fortunes.length) {
+                        usedFortuneIndices.clear();
+                        return `🥠 ${fortunes[Math.floor(Math.random() * fortunes.length)]}\n<span style="color: #666">(All fortunes have been shown. Starting a new cycle...)</span>`;
+                    }
+
+                    // Find an unused fortune
+                    let randomIndex;
+                    do {
+                        randomIndex = Math.floor(Math.random() * fortunes.length);
+                    } while (usedFortuneIndices.has(randomIndex));
+
+                    // Mark this fortune as used
+                    usedFortuneIndices.add(randomIndex);
+
+                    // Return just the fortune without the count
+                    return `🥠 ${fortunes[randomIndex]}`;
+                };
+            })(),
+
+            trail: (() => {
+                let game = null;
+                return (args) => {
+                    if (!game || !game.isRunning) {
+                        game = new OregonTrail((text) => addToOutput(text, 'output'));
+                        game.start();
+                        return;
+                    }
+                    
+                    const command = args.join(' ');
+                    if (!game.handleCommand(command)) {
+                        return 'Invalid command. Type "status" to check your progress, "help" for commands list, or "quit" to end the game.';
+                    }
+                };
+            })(),
+
+            jump: () => {
+                startGame();
+                return 'Game started! Press SPACE to jump, ESC to exit.';
+            },
+
+            version: () => `JonTerm v1.0`
+        };
+
+        // Game variables
+        let gameRunning = false;
+        let gameLoop;
+        let score = 0;
+        let gameSpeed = 5;
+        let obstacleInterval = 1500;
+        let helpTextTimeout;
+        const maxSpeed = 15;
+        const minInterval = 800;
+        const speedIncreaseInterval = 1000;
+        const varianceRange = 0.4;
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('game-container');
+        const gameOverlay = document.getElementById('game-overlay');
+
+        // Game objects
+        const player = {
+            x: 50,
+            y: canvas.height - 50,
+            width: 30,
+            height: 50,
+            jumping: false,
+            jumpForce: 15,
+            gravity: 0.8,
+            velocity: 0
+        };
+
+        const obstacles = [];
+        let obstacleTimer = 0;
+        let nextObstacleTime = 0;
+
+        function getRandomInterval(baseInterval) {
+            const variance = baseInterval * varianceRange;
+            return baseInterval + (Math.random() * variance * 2 - variance);
+        }
+
+        function showHelpText() {
+            const helpText = document.createElement('div');
+            helpText.className = 'help-text';
+            helpText.textContent = 'SPACE to jump';
+            gameContainer.appendChild(helpText);
+            
+            // Fade in
+            setTimeout(() => {
+                helpText.style.opacity = '0.7';
+            }, 100);
+
+            // Fade out after 3 seconds
+            helpTextTimeout = setTimeout(() => {
+                helpText.style.opacity = '0';
+                setTimeout(() => {
+                    helpText.remove();
+                }, 500);
+            }, 3000);
+        }
+
+        function startGame() {
+            gameContainer.style.display = 'block';
+            gameRunning = true;
+            score = 0;
+            gameSpeed = 5;
+            obstacleInterval = 1500;
+            obstacles.length = 0;
+            player.y = canvas.height - 50;
+            player.velocity = 0;
+            gameOverlay.textContent = 'Score: 0';
+            
+            // Clear any existing help text timeout
+            if (helpTextTimeout) {
+                clearTimeout(helpTextTimeout);
+            }
+            
+            // Remove any existing help text
+            const existingHelpText = gameContainer.querySelector('.help-text');
+            if (existingHelpText) {
+                existingHelpText.remove();
+            }
+            
+            // Show the help text
+            showHelpText();
+            
+            if (gameLoop) cancelAnimationFrame(gameLoop);
+            gameLoop = requestAnimationFrame(update);
+        }
+
+        function endGame() {
+            gameRunning = false;
+            cancelAnimationFrame(gameLoop);
+            // Clear help text if it's still showing
+            if (helpTextTimeout) {
+                clearTimeout(helpTextTimeout);
+            }
+            const helpText = gameContainer.querySelector('.help-text');
+            if (helpText) {
+                helpText.remove();
+            }
+            gameContainer.style.display = 'none';
+            addToOutput(`Game Over! Final Score: ${score}`);
+        }
+
+        function updateDifficulty() {
+            // Increase speed every 10 points
+            if (score > 0 && score % 10 === 0) {
+                gameSpeed = Math.min(maxSpeed, 5 + (score / 10));
+                obstacleInterval = Math.max(minInterval, 1500 - (score * 20));
+            }
+        }
+
+        function update() {
+            if (!gameRunning) return;
+
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update player
+            if (player.jumping) {
+                player.velocity += player.gravity;
+                player.y += player.velocity;
+
+                if (player.y > canvas.height - 50) {
+                    player.y = canvas.height - 50;
+                    player.jumping = false;
+                    player.velocity = 0;
+                }
+            }
+
+            // Draw ground
+            ctx.fillStyle = '#00ff00';
+            ctx.fillRect(0, canvas.height - 10, canvas.width, 10);
+
+            // Draw player
+            ctx.fillStyle = '#00ff00';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Update and draw obstacles
+            obstacleTimer += 16; // approximately 60fps
+            if (obstacleTimer >= nextObstacleTime) {
+                obstacles.push({
+                    x: canvas.width,
+                    y: canvas.height - 40,
+                    width: 20,
+                    height: 40
+                });
+                obstacleTimer = 0;
+                nextObstacleTime = getRandomInterval(obstacleInterval);
+            }
+
+            obstacles.forEach((obstacle, index) => {
+                obstacle.x -= gameSpeed;
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+
+                // Check collision
+                if (checkCollision(player, obstacle)) {
+                    endGame();
+                    return;
+                }
+
+                // Remove off-screen obstacles
+                if (obstacle.x + obstacle.width < 0) {
+                    obstacles.splice(index, 1);
+                    score++;
+                    gameOverlay.textContent = `Score: ${score}`;
+                    updateDifficulty();
+                }
+            });
+
+            gameLoop = requestAnimationFrame(update);
+        }
+
+        function checkCollision(player, obstacle) {
+            return player.x < obstacle.x + obstacle.width &&
+                   player.x + player.width > obstacle.x &&
+                   player.y < obstacle.y + obstacle.height &&
+                   player.y + player.height > obstacle.y;
+        }
+
+        // Event listeners
+        document.addEventListener('keydown', (e) => {
+            if (gameRunning) {
+                e.preventDefault(); // Prevent default behavior
+                e.stopPropagation(); // Stop event from bubbling up
+                
+                if ((e.code === 'Space' || e.code === 'Enter') && !player.jumping) {
+                    player.jumping = true;
+                    player.velocity = -player.jumpForce;
+                } else if (e.code === 'Escape') {
+                    endGame();
+                }
+            }
+        });
+
+        const terminal = document.getElementById('terminal');
+        const output = document.getElementById('output');
+        const commandInput = document.getElementById('command-input');
+        const cursor = document.querySelector('.custom-cursor');
+
+        function addToOutput(text, type = 'normal') {
+            const line = document.createElement('div');
+            if (type === 'command' || type === 'output') {
+                line.innerHTML = text; // Allow HTML for colored command help text
+            } else {
+                line.textContent = text;
+            }
+            line.className = type;
+            output.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function processCommand(input) {
+            const [command, ...args] = input.trim().split(' ');
+            
+            if (commands[command]) {
+                const result = commands[command](args);
+                if (result instanceof Promise) {
+                    addToOutput('Fetching data...');
+                    result.then(output => {
+                        if (output) addToOutput(output, 'output');
+                    }).catch(error => {
+                        addToOutput('An error occurred while processing the command.', 'error');
+                    });
+                } else if (result) {
+                    addToOutput(result, 'output');
+                }
+            } else if (command) {
+                addToOutput(`Command not found: ${command}. Type 'help' for available commands.`, 'error');
+            }
+        }
+
+        function updateCursorPosition() {
+            const inputRect = commandInput.getBoundingClientRect();
+            const promptRect = document.getElementById('prompt').getBoundingClientRect();
+            const inputText = commandInput.value;
+            
+            // Create a temporary span to measure text width
+            const temp = document.createElement('span');
+            temp.style.font = window.getComputedStyle(commandInput).font;
+            temp.style.visibility = 'hidden';
+            temp.style.position = 'absolute';
+            temp.textContent = inputText;
+            document.body.appendChild(temp);
+            
+            // Calculate cursor position
+            const textWidth = temp.offsetWidth;
+            document.body.removeChild(temp);
+            
+            // Position cursor after the prompt and text
+            cursor.style.transform = `translateX(${textWidth}px)`;
+            cursor.style.left = `${promptRect.width + 10}px`; // 10px is the margin-right of prompt
+        }
+
+        // Update cursor position on input and click
+        commandInput.addEventListener('input', updateCursorPosition);
+        commandInput.addEventListener('click', updateCursorPosition);
+        
+        // Handle command input
+        commandInput.addEventListener('keypress', (e) => {
+            if (!gameRunning && e.key === 'Enter') {
+                const input = commandInput.value.trim();
+                if (input) {
+                    addToOutput(`visitor@jonbonney.com:~$ ${input}`);
+                    commandHistory.push(input);
+                    currentHistoryIndex = commandHistory.length;
+                    processCommand(input);
+                }
+                commandInput.value = '';
+                updateCursorPosition(); // Reset cursor position after clearing input
+            }
+        });
+
+        // Add keyboard navigation for command history
+        commandInput.addEventListener('keydown', (e) => {
+            if (!gameRunning) {
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (currentHistoryIndex > 0) {
+                        currentHistoryIndex--;
+                        commandInput.value = commandHistory[currentHistoryIndex];
+                        // Move cursor to end of input
+                        setTimeout(updateCursorPosition, 0);
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (currentHistoryIndex < commandHistory.length - 1) {
+                        currentHistoryIndex++;
+                        commandInput.value = commandHistory[currentHistoryIndex];
+                        // Move cursor to end of input
+                        setTimeout(updateCursorPosition, 0);
+                    } else if (currentHistoryIndex === commandHistory.length - 1) {
+                        currentHistoryIndex = commandHistory.length;
+                        commandInput.value = '';
+                        // Reset cursor position
+                        setTimeout(updateCursorPosition, 0);
+                    }
+                }
+            }
+        });
+
+        // Keep focus on input when game is not running and update cursor
+        document.addEventListener('click', () => {
+            if (!gameRunning) {
+                commandInput.focus();
+                updateCursorPosition();
+            }
+        });
+
+        // Initial cursor position
+        updateCursorPosition();
+
+        // Add window resize handler to maintain cursor position
+        window.addEventListener('resize', updateCursorPosition);
+
+        // Update cursor position when terminal scrolls
+        document.getElementById('terminal').addEventListener('scroll', updateCursorPosition);
+    </script>
+</body>
+</html>
