@@ -1,5 +1,5 @@
 # JonTerm
-This repo contains all open source releases of JonTerm from my website [jonbonney.com/terminal](jonbonney.com/terminal)
+This repo contains all open source releases of JonTerm from my website [jonbonney.com/terminal](https://jonbonney.com/terminal)
 
 ![jonterm-help](https://github.com/user-attachments/assets/eacd7f60-b416-4ff2-b201-67b7c15e6839)
 
